@@ -174,6 +174,8 @@ async function loadPlaylist(q){
   if(!data||!Array.isArray(data.tracks)||!data.tracks.length)throw Error();
   state.playlistMode=true;
   state.playlistInfo=data;
+  $("autoplayBadge").textContent="PLAYLIST";
+  $("upNextLabel").textContent="Next track will follow the playlist order";
   state.songs=data.tracks.map(t=>({
     title:t.title||"Unknown song",
     artist:t.artist||"Unknown artist",
@@ -197,6 +199,8 @@ async function search(){
       await loadPlaylist(q);
     }else{
       state.playlistMode=false;state.playlistInfo=null;setPlaylistHeader(null);
+      $("autoplayBadge").textContent=state.autoMood?"AUTO • ON":"AUTO • OFF";
+      $("upNextLabel").textContent=state.autoMood?"Up next will be picked automatically":"Auto mood is off";
       const r=await fetch("/api/search?q="+encodeURIComponent(q));if(!r.ok)throw Error();
       state.songs=normalize(await r.json());$("emptyState").textContent=state.songs.length?"":"No songs found.";render();
     }
@@ -237,7 +241,7 @@ async function play(index){
   try{
     const src=await getAudio(song);if(request!==state.playRequest)return;if(!src)throw Error("No stream URL");
     audio.src=src;audio.load();await audio.play();
-    if(state.autoMood&&index===state.songs.length-1)findMoodSongs(song);
+    if(state.autoMood&&!state.playlistMode&&index===state.songs.length-1)findMoodSongs(song);
   }catch(e){if(request!==state.playRequest)return;console.error(e);$("playPauseButton").textContent="▶";$("fullPlay").textContent="▶";alert("Unable to play this song right now.")}
 }
 function setPlayer(s){
