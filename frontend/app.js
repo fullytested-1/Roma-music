@@ -129,6 +129,9 @@ function toggle(){if(audio.paused)audio.play().catch(()=>{});else audio.pause()}
 function next(){if(!state.songs.length)return;const n=state.current+1;if(n<state.songs.length)play(n);else if(state.autoMood&&state.songs[state.current])findMoodSongs(state.songs[state.current]).then(x=>x.length?play(state.current+1):null);else play(0)}
 function prev(){if(!state.songs.length)return;play((state.current-1+state.songs.length)%state.songs.length)}
 $("searchButton").onclick=search;
+$("searchInput").addEventListener("focus",()=>{$("featuredSection").classList.add("searching")});
+$("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
+$("featuredResults").addEventListener("click",e=>{const p=e.target.closest("[data-featured-play]");if(p)playFeatured(Number(p.dataset.featuredPlay))});
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
 $("results").addEventListener("click",e=>{const p=e.target.closest("[data-play]"),d=e.target.closest("[data-download]");if(p)play(Number(p.dataset.play));if(d)download(Number(d.dataset.download))});
 async function download(i){try{const src=await getAudio(state.songs[i]);if(src)window.open(src,"_blank");else alert("Download link not found.")}catch{alert("Download failed.")}}
@@ -142,4 +145,24 @@ audio.addEventListener("pause",()=>{$("playPauseButton").textContent="▶";$("fu
 audio.addEventListener("ended",()=>next());
 audio.addEventListener("timeupdate",()=>{const p=audio.duration?(audio.currentTime/audio.duration)*100:0;$("miniProgress").style.width=p+"%";$("seekBar").value=p;$("currentTime").textContent=fmt(audio.currentTime);$("totalTime").textContent=fmt(audio.duration)});
 $("seekBar").addEventListener("input",e=>{if(audio.duration)audio.currentTime=(Number(e.target.value)/100)*audio.duration});
-function fmt(s){if(!Number.isFinite(s))return"0:00";const m=Math.floor(s/60),sec=Math.floor(s%60).toString().padStart(2,"0");return m+":"+sec}
+function fmt(s){if(!Number.isFinite(s))return"0:00";const m=Math.floor(s/60),sec=Math.floor(s%60).toString().padStart(2,"0");return m+":"+sec}const FEATURED=[["sorry i like you","burbank"],["Affection","Jinsang"],["Feather","Nujabes"],["5:32 PM","The Deli"],["This Is What Falling in Love Feels Like (Lofi)","JVKE"],["controlla","Idealism"],["Losing Interest","Itssvd feat. Shiloh Dynasty"],["I'm Closing My Eyes","Potsu feat. Shiloh Dynasty"],["Walk But In A Garden",".yu-utsu"],["Warm Glow","Hippo Campus"],["Iktara (Lofi Flip)","VIBIE & Amit Trivedi"],["Zara Zara (Lofi)","Bombay Jayashri"],["Jeene Laga Hoon (Lofi Mix)","Atif Aslam"],["Mehrama (Lofi Flip)","Darshan Raval & Silent Ocean"],["Heeriye (Lofi Mix)","Arijit Singh & Jasleen Royal"],["Hosanna (Lofi Flip)","Leon D'souza"],["Pehla Nasha (LoFi)","Udit Narayan"],["Tum Mile (Lofi Flip)","Pritam"],["Kabira (Lofi Reprise)","Tochi Raina & Rekha Bhardwaj"],["Channa Mereya (Lofi Chill)","Arijit Singh"],["Agar Tum Saath Ho (Lofi Flip)","Alka Yagnik & Arijit Singh"],["Tum Hi Ho (Slowed + Reverb)","Arijit Singh"],["Kun Faya Kun (Lofi Ambient)","A.R. Rahman"],["Ranjha (Lofi Version)","B Praak & Jasleen Royal"],["Raatan Lambiyan (Lofi Mix)","Jubin Nautiyal"]];
+function featuredCard(song,index){
+  const art=song.thumbnail?"<img src=\""+esc(song.thumbnail)+"\" alt=\"\">":"<div class=\"featured-placeholder\">♪</div>";
+  return "<article class=\"featured-card\"><div class=\"featured-art\">"+art+"<span class=\"featured-number\">"+String(index+1).padStart(2,"0")+"</span></div><div class=\"featured-info\"><strong>"+esc(song.title)+"</strong><small>"+esc(song.artist)+"</small></div><button class=\"featured-play\" data-featured-play=\""+index+"\">▶</button></article>";
+}
+function renderFeatured(){ $("featuredResults").innerHTML=state.featured.map(featuredCard).join(""); $("featuredCount").textContent=FEATURED.length+" tracks"; }
+async function resolveFeatured(){
+  let cursor=0;
+  async function worker(){
+    while(cursor<FEATURED.length){ const i=cursor++; const [title,artist]=FEATURED[i]; try{ const r=await fetch("/api/search?q="+encodeURIComponent(title+" "+artist)); if(!r.ok)continue; const items=normalize(await r.json()); if(items[0]){state.featured[i]={...state.featured[i],...items[0],title,artist};renderFeatured();} }catch{} }
+  }
+  await Promise.all([worker(),worker(),worker(),worker()]);
+}
+function loadFeatured(){ state.featured=FEATURED.map(([title,artist])=>({title,artist,thumbnail:"",url:""})); renderFeatured(); resolveFeatured(); }
+async function playFeatured(index){
+  let song=state.featured[index]; if(!song)return;
+  if(!song.url){ try{ const r=await fetch("/api/search?q="+encodeURIComponent(song.title+" "+song.artist)); if(!r.ok)throw Error(); const items=normalize(await r.json()); if(items[0]){song={...song,...items[0],title:song.title,artist:song.artist};state.featured[index]=song;renderFeatured();} }catch{alert("This track could not be loaded right now.");return;} }
+  if(!song.url)return; state.songs=state.featured.filter(s=>s.url); render(); const n=state.songs.findIndex(s=>s.url===song.url); if(n>=0)play(n);
+}
+
+loadFeatured();
