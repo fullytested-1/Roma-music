@@ -2,6 +2,8 @@ import os
 import re
 import asyncio
 import hashlib
+import shutil
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -103,6 +105,36 @@ async def cloudinary_cached_asset(public_id: str):
 async def root():
     return FileResponse(FRONTEND / "index.html")
 
+
+SERVER_STARTED_AT=time.time()
+
+@app.get("/api/system-status")
+async def system_status():
+    try:
+        import psutil
+        vm=psutil.virtual_memory()
+        ram_used=vm.used
+        ram_total=vm.total
+        ram_percent=vm.percent
+    except Exception:
+        ram_used=ram_total=ram_percent=0
+    try:
+        disk=shutil.disk_usage("/")
+        disk_used=disk.used
+        disk_total=disk.total
+        disk_percent=(disk.used/disk.total*100) if disk.total else 0
+    except Exception:
+        disk_used=disk_total=disk_percent=0
+    uptime=time.time()-SERVER_STARTED_AT
+    return {
+        "uptime_seconds":round(uptime),
+        "ram_used":ram_used,
+        "ram_total":ram_total,
+        "ram_percent":round(ram_percent,1),
+        "disk_used":disk_used,
+        "disk_total":disk_total,
+        "disk_percent":round(disk_percent,1),
+    }
 
 @app.get("/api/timezone")
 async def timezone(request: Request):
