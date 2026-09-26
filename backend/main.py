@@ -76,7 +76,10 @@ def find_cached_song(mega, folder, source_url: str):
     digest = __import__("hashlib").sha256(source_url.encode()).hexdigest()[:16]
     files = mega.get_files()
     for _, node in files.items():
-        if node.get("t") == 0 and node.get("name", "").endswith(f"-{digest}.mp3"):
+        # mega.py stores the decrypted filename under node["a"]["n"],
+        # not node["name"].
+        node_name = (node.get("a") or {}).get("n") or node.get("name") or ""
+        if node.get("t") == 0 and node_name.endswith(f"-{digest}.mp3"):
             return node
     return None
 
