@@ -1,4 +1,4 @@
-const state={songs:[],current:-1,loading:false,playRequest:0,autoMood:true,recommending:false,featured:[],featuredLoaded:false};
+const state={songs:[],current:-1,loading:false,playRequest:0,autoMood:true,recommending:false,featured:[],featuredLoaded:false,playlistMode:false,playlistInfo:null};
 const $=id=>document.getElementById(id);
 const audio=$("audioPlayer");
 
@@ -145,9 +145,20 @@ async function playFeatured(index){
     if(n>=0)play(n);
   }
 }
+function isSpotifyPlaylistUrl(q){return /open\.spotify\.com\/playlist\/[A-Za-z0-9]+/i.test(q)}
+function setPlaylistHeader(info){
+  const header=$("playlistHeader");if(!header)return;
+  if(!info){header.classList.add("hidden");return}
+  $("playlistCover").src=info.cover||"";
+  $("playlistTitle").textContent=info.name||"Spotify Playlist";
+  const owner=info.owner?(" • "+info.owner):"";
+  $("playlistMeta").textContent=(info.count||info.total||state.songs.length)+" tracks"+owner;
+  header.classList.remove("hidden");
+}
 function render(){
   const box=$("results");box.innerHTML="";
   $("resultCount").textContent=state.songs.length?state.songs.length+" songs":"";
+  $("resultsTitle").textContent=state.playlistMode?"Playlist tracks":"Search results";
   if(!state.songs.length){$("emptyState").classList.remove("hidden");return}
   $("emptyState").classList.add("hidden");
   state.songs.forEach((s,i)=>{
@@ -156,15 +167,46 @@ function render(){
     box.appendChild(el);
   });
 }
+async function loadPlaylist(q){
+  const r=await fetch("/api/playlist?url="+encodeURIComponent(q),{cache:"no-store"});
+  if(!r.ok)throw Error();
+  const data=await r.json();
+  if(!data||!Array.isArray(data.tracks)||!data.tracks.length)throw Error();
+  state.playlistMode=true;
+  state.playlistInfo=data;
+  state.songs=data.tracks.map(t=>({
+    title:t.title||"Unknown song",
+    artist:t.artist||"Unknown artist",
+    thumbnail:t.thumbnail||data.cover||"",
+    url:t.url||"",
+    duration:t.duration||0,
+    durationMs:t.durationMs||0,
+    playlist:data.name||""
+  })).filter(s=>s.url);
+  state.current=-1;
+  setPlaylistHeader(data);
+  render();
+}
 async function search(){
   const q=$("searchInput").value.trim();if(!q)return;
   state.loading=true;
   $("results").innerHTML="";$("emptyState").classList.remove("hidden");$("emptyState").textContent="Searching…";
   try{
-    const r=await fetch("/api/search?q="+encodeURIComponent(q));if(!r.ok)throw Error();
-    state.songs=normalize(await r.json());$("emptyState").textContent=state.songs.length?"":"No songs found.";render();
+    const playlistRequested=$("playlistToggle").classList.contains("on");
+    if(playlistRequested||isSpotifyPlaylistUrl(q)){
+      await loadPlaylist(q);
+    }else{
+      state.playlistMode=false;state.playlistInfo=null;setPlaylistHeader(null);
+      const r=await fetch("/api/search?q="+encodeURIComponent(q));if(!r.ok)throw Error();
+      state.songs=normalize(await r.json());$("emptyState").textContent=state.songs.length?"":"No songs found.";render();
+    }
     document.querySelector(".search-results-section").scrollIntoView({behavior:"smooth",block:"start"});
-  }catch{$("emptyState").textContent="Search failed. Please try again."}
+  }catch{
+    state.songs=[];
+    render();
+    $("emptyState").classList.remove("hidden");
+    $("emptyState").textContent=state.playlistMode?"Playlist could not be loaded. Check the Spotify playlist link and try again.":"Search failed. Please try again.";
+  }
   finally{state.loading=false}
 }
 async function getAudio(song){
@@ -198,14 +240,35 @@ async function play(index){
     if(state.autoMood&&index===state.songs.length-1)findMoodSongs(song);
   }catch(e){if(request!==state.playRequest)return;console.error(e);$("playPauseButton").textContent="▶";$("fullPlay").textContent="▶";alert("Unable to play this song right now.")}
 }
-function setPlayer(s){$("miniThumb").src=s.thumbnail;$("miniTitle").textContent=s.title;$("miniArtist").textContent=s.artist;$("playerThumb").src=s.thumbnail;$("playerTitle").textContent=s.title;$("playerArtist").textContent=s.artist;$("miniPlayer").classList.remove("hidden")}
+function setPlayer(s){
+  $("miniThumb").src=s.thumbnail;$("miniTitle").textContent=s.title;$("miniArtist").textContent=s.artist;
+  $("playerThumb").src=s.thumbnail;$("playerTitle").textContent=s.title;$("playerArtist").textContent=s.artist;
+  $("miniPlayer").classList.remove("hidden");
+  $("upNextLabel").textContent=state.playlistMode?"Next track will follow the playlist order":(state.autoMood?"Up next will be picked automatically":"Auto mood is off");
+}
 function toggle(){if(audio.paused)audio.play().catch(()=>{});else audio.pause()}
-function next(){if(!state.songs.length)return;const n=state.current+1;if(n<state.songs.length)play(n);else if(state.autoMood&&state.songs[state.current])findMoodSongs(state.songs[state.current]).then(x=>x.length?play(state.current+1):null);else play(0)}
-function prev(){if(!state.songs.length)return;play((state.current-1+state.songs.length)%state.songs.length)}
+function next(){
+  if(!state.songs.length)return;
+  const n=state.current+1;
+  if(n<state.songs.length){play(n);return}
+  if(state.playlistMode)return;
+  if(state.autoMood&&state.songs[state.current])findMoodSongs(state.songs[state.current]).then(x=>x.length?play(state.current+1):null);
+  else play(0);
+}
+function prev(){
+  if(!state.songs.length)return;
+  play((state.current-1+state.songs.length)%state.songs.length);
+}
 $("menuButton").onclick=()=>{$("sideMenu").classList.add("open");$("sideMenu").setAttribute("aria-hidden","false");$("menuButton").setAttribute("aria-expanded","true")};
 $("closeMenu").onclick=()=>{$("sideMenu").classList.remove("open");$("sideMenu").setAttribute("aria-hidden","true");$("menuButton").setAttribute("aria-expanded","false")};
 $("sideMenu").addEventListener("click",e=>{if(e.target===$("sideMenu"))$("closeMenu").click()});
 $("searchButton").onclick=search;
+$("playlistToggle").onclick=()=>{
+  const on=!$("playlistToggle").classList.contains("on");
+  $("playlistToggle").classList.toggle("on",on);
+  $("playlistToggle").setAttribute("aria-pressed",String(on));
+  $("searchInput").placeholder=on?"Paste Spotify playlist URL...":"Songs, artists, albums...";
+};
 $("searchInput").addEventListener("focus",()=>{$("featuredSection").classList.add("searching")});
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
 $("featuredResults").addEventListener("click",e=>{const p=e.target.closest("[data-featured-play]");if(p)playFeatured(Number(p.dataset.featuredPlay))});
@@ -216,7 +279,7 @@ $("miniInfo").onclick=()=>{$("fullPlayer").classList.add("open");$("fullPlayer")
 $("closePlayer").onclick=()=>{$("fullPlayer").classList.remove("open");$("fullPlayer").setAttribute("aria-hidden","true")};
 $("playPauseButton").onclick=e=>{e.stopPropagation();toggle()};$("prevButton").onclick=e=>{e.stopPropagation();prev()};$("nextButton").onclick=e=>{e.stopPropagation();next()};
 $("fullPlay").onclick=toggle;$("fullPrev").onclick=prev;$("fullNext").onclick=next;
-$("autoplayToggle").onclick=()=>{state.autoMood=!state.autoMood;$("autoplayToggle").classList.toggle("on",state.autoMood);$("autoplayToggle").setAttribute("aria-pressed",String(state.autoMood));$("autoplayBadge").textContent=state.autoMood?"AUTO • ON":"AUTO • OFF";$("upNextLabel").textContent=state.autoMood?"Up next will be picked automatically":"Auto mood is off"};
+$("autoplayToggle").onclick=()=>{state.autoMood=!state.autoMood;$("autoplayToggle").classList.toggle("on",state.autoMood);$("autoplayToggle").setAttribute("aria-pressed",String(state.autoMood));$("autoplayBadge").textContent=state.autoMood?"AUTO • ON":"AUTO • OFF";$("upNextLabel").textContent=state.playlistMode?"Next track will follow the playlist order":(state.autoMood?"Up next will be picked automatically":"Auto mood is off")};
 audio.addEventListener("play",()=>{$("playPauseButton").textContent="Ⅱ";$("fullPlay").textContent="Ⅱ"});
 audio.addEventListener("pause",()=>{$("playPauseButton").textContent="▶";$("fullPlay").textContent="▶"});
 audio.addEventListener("ended",()=>next());
