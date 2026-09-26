@@ -128,6 +128,9 @@ function setPlayer(s){$("miniThumb").src=s.thumbnail;$("miniTitle").textContent=
 function toggle(){if(audio.paused)audio.play().catch(()=>{});else audio.pause()}
 function next(){if(!state.songs.length)return;const n=state.current+1;if(n<state.songs.length)play(n);else if(state.autoMood&&state.songs[state.current])findMoodSongs(state.songs[state.current]).then(x=>x.length?play(state.current+1):null);else play(0)}
 function prev(){if(!state.songs.length)return;play((state.current-1+state.songs.length)%state.songs.length)}
+$("menuButton").onclick=()=>{$("sideMenu").classList.add("open");$("sideMenu").setAttribute("aria-hidden","false");$("menuButton").setAttribute("aria-expanded","true")};
+$("closeMenu").onclick=()=>{$("sideMenu").classList.remove("open");$("sideMenu").setAttribute("aria-hidden","true");$("menuButton").setAttribute("aria-expanded","false")};
+$("sideMenu").addEventListener("click",e=>{if(e.target===$("sideMenu"))$("closeMenu").click()});
 $("searchButton").onclick=search;
 $("searchInput").addEventListener("focus",()=>{$("featuredSection").classList.add("searching")});
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
