@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Search & Downloader</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #0f0f0f; /* ഡാർക്ക് ബ്ലാക്ക് ബാക്ക്ഗ്രൗണ്ട് */
+            color: #ffffff; 
+            text-align: center; 
+            padding: 20px; 
+        }
+
+        h1 {
+            color: #1ed760; /* ലൈറ്റ് പച്ച കളർ */
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            margin-bottom: 30px;
+        }
+
+        input { 
+            padding: 12px 15px; 
+            width: 350px; 
+            border-radius: 25px; 
+            border: 2px solid #222; 
+            background: #181818;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            border-color: #1ed760; /* സെർച്ച് ബോക്സിൽ ക്ലിക്ക് ചെയ്യുമ്പോൾ പച്ച ബോർഡർ വരും */
+        }
+
+        button { 
+            padding: 12px 25px; 
+            background: #1ed760; /* ഇളം പച്ച ബട്ടൺ */
+            color: #000; /* കറുത്ത അക്ഷരങ്ങൾ */
+            font-weight: bold;
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-size: 16px;
+            margin-left: 10px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #1faa50; /* മൗസ് വെക്കുമ്പോൾ കളർ ചെറിയ ഡാർക്ക് ആകും */
+        }
+
+        .song-card { 
+            background: #181818; /* കാർഡിന്റെ കറുപ്പ് നിറം */
+            border: 1px solid #282828;
+            margin: 12px auto; 
+            padding: 12px; 
+            width: 500px; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            transition: 0.2s;
+        }
+
+        .song-card:hover {
+            background: #202020;
+        }
+
+        .song-card img { 
+            width: 65px; 
+            height: 65px; 
+            border-radius: 8px; 
+            object-fit: cover;
+        }
+
+        .details { 
+            text-align: left; 
+            margin-left: 15px; 
+            flex-grow: 1; 
+        }
+
+        .details strong {
+            color: #fff;
+            font-size: 15px;
+        }
+
+        .details small {
+            color: #b3b3b3; /* ഇളം ഗ്രേ കളർ ആർട്ടിസ്റ്റിന്റെ പേരിന് */
+        }
+
+        .song-card button {
+            background: transparent;
+            color: #1ed760;
+            border: 2px solid #1ed760;
+            padding: 8px 15px;
+            font-size: 14px;
+            border-radius: 20px;
+        }
+
+        .song-card button:hover {
+            background: #1ed760;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Spotify Music Search & Downloader</h1>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search songs, artists...">
+        <button onclick="searchSongs()">Search</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script src="app.js"></script>
+</body>
+  </html>
+  
