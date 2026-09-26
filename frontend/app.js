@@ -75,6 +75,7 @@ async function updateBattery(){
   }catch{if(card)card.textContent="--%";if(label)label.textContent="Not supported by this browser";}
 }
 
+function esc(v){return String(v??"").replace(/[&<>"\']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","\'":"&#39;"}[m]));}
 function normalize(data){const raw=data?.result||data?.tracks||data?.data||[];return (Array.isArray(raw)?raw:[]).map(t=>({title:t.title||t.name||t.trackName||"Unknown song",artist:t.artist||t.artists||"Unknown artist",thumbnail:t.thumbnail||t.cover||t.image||"",url:t.url||t.spotifyUrl||t.link||"",duration:t.duration||0})).filter(s=>s.url);}
 function featuredCard(song,index){
   const thumb=song.thumbnail||"";
