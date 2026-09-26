@@ -58,20 +58,28 @@
   <div id="fullPlayer" class="player-overlay" aria-hidden="true">
     <div class="player-panel">
       <button id="closePlayer" class="close-player" aria-label="Close">×</button>
-      <img id="playerThumb" class="player-thumb" src="" alt="">
-      <p class="now-playing-label">NOW PLAYING</p>
-      <h2 id="playerTitle">Nothing playing</h2>
-      <p id="playerArtist"></p>
+      <div class="player-topline"><span class="live-dot"></span><span>NOW PLAYING</span><span id="autoplayBadge" class="autoplay-badge">AUTO • ON</span></div>
+      <div class="cover-wrap"><img id="playerThumb" class="player-thumb" src="" alt=""></div>
+      <div class="player-meta">
+        <p class="player-kicker">ROMA MUSIC</p>
+        <h2 id="playerTitle">Nothing playing</h2>
+        <p id="playerArtist"></p>
+      </div>
       <div class="progress-row">
         <span id="currentTime">0:00</span>
-        <input id="seekBar" type="range" min="0" max="100" value="0">
+        <input id="seekBar" type="range" min="0" max="100" value="0" aria-label="Seek">
         <span id="totalTime">0:00</span>
       </div>
       <div class="player-controls">
-        <button id="fullPrev">‹</button>
-        <button id="fullPlay" class="main-play">▶</button>
-        <button id="fullNext">›</button>
+        <button id="fullPrev" aria-label="Previous">↶</button>
+        <button id="fullPlay" class="main-play" aria-label="Play or pause">▶</button>
+        <button id="fullNext" aria-label="Next">↷</button>
       </div>
+      <div class="autoplay-row">
+        <div><strong>Endless mood</strong><small>When this song ends, Roma finds another song with a similar vibe.</small></div>
+        <button id="autoplayToggle" class="toggle on" type="button" aria-pressed="true"><span></span></button>
+      </div>
+      <div id="upNextLabel" class="up-next">Up next will be picked automatically</div>
     </div>
   </div>
 
