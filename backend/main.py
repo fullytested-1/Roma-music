@@ -1,5 +1,14 @@
 import os
 import re
+import asyncio
+import types
+
+# mega.py 1.0.8 depends on tenacity 5.x, which still references
+# asyncio.coroutine. Python 3.11 removed that alias, so restore the
+# compatible alias before importing mega.py.
+if not hasattr(asyncio, "coroutine"):
+    asyncio.coroutine = types.coroutine
+
 import tempfile
 from pathlib import Path
 from urllib.parse import quote
