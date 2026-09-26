@@ -9,7 +9,7 @@ import cloudinary
 import cloudinary.api
 import cloudinary.uploader
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -103,6 +103,22 @@ async def cloudinary_cached_asset(public_id: str):
 async def root():
     return FileResponse(FRONTEND / "index.html")
 
+
+@app.get("/api/timezone")
+async def timezone(request: Request):
+    forwarded=request.headers.get("x-forwarded-for","")
+    client_ip=(forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else ""))
+    if client_ip in {"127.0.0.1","::1","localhost"}:
+        return {"timezone": ""}
+    try:
+        async with httpx.AsyncClient(timeout=4) as client:
+            r=await client.get(f"https://ipapi.co/{client_ip}/json/")
+            if r.status_code==200:
+                data=r.json()
+                return {"timezone":data.get("timezone",""),"ip":client_ip}
+    except Exception:
+        pass
+    return {"timezone":""}
 
 @app.get("/api/search")
 async def search(q: str):
