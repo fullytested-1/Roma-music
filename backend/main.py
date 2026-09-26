@@ -133,11 +133,26 @@ async def download(
         raise HTTPException(400, "Song URL is required")
 
     mega = mega_client()
-    folder = mega.find(MEGA_FOLDER)
-    if not folder:
-        folder = mega.create_folder(MEGA_FOLDER)
 
-    cached = find_cached_song(mega, folder, url)
+    # mega.py has two different return shapes here:
+    # find() returns a node/list, while create_folder() returns a dict
+    # like {"RomaMusic": "<node-id>"}. Normalize both to one node id.
+    folder = mega.find(MEGA_FOLDER)
+    if folder:
+        if isinstance(folder, list):
+            folder_id = folder[0] if folder else None
+        elif isinstance(folder, tuple):
+            folder_id = folder[0] if folder else None
+        else:
+            folder_id = folder
+    else:
+        created = mega.create_folder(MEGA_FOLDER)
+        folder_id = created.get(MEGA_FOLDER) if isinstance(created, dict) else created
+
+    if not folder_id:
+        raise HTTPException(502, "Mega folder could not be created or found")
+
+    cached = find_cached_song(mega, folder_id, url)
     if cached:
         try:
             return {
@@ -165,7 +180,17 @@ async def download(
                     async for chunk in response.aiter_bytes(1024 * 1024):
                         out.write(chunk)
 
-        uploaded = mega.upload(str(temp_path), folder[0] if isinstance(folder, list) else folder)
+        # mega.py's upload() is synchronous, so run it off the FastAPI
+        # event loop. The destination must be the actual Mega node id.
+        uploaded = await asyncio.to_thread(
+            mega.upload,
+            str(temp_path),
+            folder_id,
+        )
+
+        if not uploaded:
+            raise RuntimeError("Mega upload returned no file node")
+
         return {
             "stream_url": f"/api/stream?source_url={quote(url, safe='')}",
             "cached": False,
