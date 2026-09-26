@@ -6,8 +6,10 @@ const FEATURED=[["sorry i like you","burbank"],["Affection","Jinsang"],["Feather
 function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 function normalize(data){const raw=data?.result||data?.tracks||data?.data||[];return (Array.isArray(raw)?raw:[]).map(t=>({title:t.title||t.name||t.trackName||"Unknown song",artist:t.artist||t.artists||"Unknown artist",thumbnail:t.thumbnail||t.cover||t.image||"",url:t.url||t.spotifyUrl||t.link||"",duration:t.duration||0})).filter(s=>s.url);}
 function featuredCard(song,index){
+  const thumb=song.thumbnail||"";
+  const art=thumb?`<img src="${esc(thumb)}" alt="">`:`<div class="featured-placeholder">♪</div>`;
   return `<article class="featured-card">
-    <div class="featured-art"><img src="${esc(song.thumbnail)}" alt=""><span class="featured-number">${String(index+1).padStart(2,"0")}</span></div>
+    <div class="featured-art">${art}<span class="featured-number">${String(index+1).padStart(2,"0")}</span></div>
     <div class="featured-info"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></div>
     <button class="featured-play" data-featured-play="${index}" aria-label="Play ${esc(song.title)}">▶</button>
   </article>`;
@@ -15,11 +17,10 @@ function featuredCard(song,index){
 function renderFeatured(){
   const box=$("featuredResults");
   box.innerHTML=state.featured.map(featuredCard).join("");
-  $("featuredLoading").classList.toggle("hidden",state.featuredLoaded);
-  $("featuredCount").textContent=state.featured.length+" tracks";
+  $("featuredLoading").classList.add("hidden");
+  $("featuredCount").textContent=FEATURED.length+" tracks";
 }
-async function loadFeatured(){
-  const out=[];
+async function resolveFeatured(){
   let cursor=0;
   async function worker(){
     while(cursor<FEATURED.length){
@@ -29,14 +30,20 @@ async function loadFeatured(){
         const r=await fetch("/api/search?q="+encodeURIComponent(title+" "+artist));
         if(!r.ok)continue;
         const items=normalize(await r.json());
-        if(items[0])out[i]={...items[0],title,artist};
+        if(items[0]){
+          state.featured[i]={...state.featured[i],...items[0],title,artist};
+          renderFeatured();
+        }
       }catch{}
     }
   }
   await Promise.all([worker(),worker(),worker(),worker()]);
-  state.featured=FEATURED.map((pair,i)=>out[i]||({title:pair[0],artist:pair[1],thumbnail:"",url:""})).filter(s=>s.url);
+}
+function loadFeatured(){
+  state.featured=FEATURED.map(([title,artist])=>({title,artist,thumbnail:"",url:""}));
   state.featuredLoaded=true;
   renderFeatured();
+  resolveFeatured();
 }
 function playFeatured(index){
   const song=state.featured[index];
