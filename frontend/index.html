@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#b8ff65">
+  <meta name="theme-color" content="#0a1020">
   <title>Roma Music</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -23,16 +23,16 @@
       </div>
     </section>
 
-    <section id="historySection" class="results-section history-section">
+    <section id="featuredSection" class="featured-section">
       <div class="section-head">
-        <h2>Played before</h2>
-        <button id="clearHistory" class="clear-history" type="button">Clear</button>
+        <div><p class="section-kicker">ROMA CURATED</p><h2>Late Night • Lofi • Aesthetic</h2></div>
+        <span id="featuredCount">25 tracks</span>
       </div>
-      <div id="historyResults" class="results"></div>
-      <div id="historyEmpty" class="empty-state">Songs you play will appear here.</div>
+      <div id="featuredResults" class="featured-grid"></div>
+      <div id="featuredLoading" class="featured-loading">Loading your curated tracks…</div>
     </section>
 
-    <section class="results-section">
+    <section class="results-section search-results-section">
       <div class="section-head">
         <h2 id="resultsTitle">Search results</h2>
         <span id="resultCount"></span>
