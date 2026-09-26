@@ -173,19 +173,29 @@ async def timezone(request: Request):
 
 @app.get("/api/search")
 async def search(q: str):
-    if not q.strip():
+    query=q.strip()
+    if not query:
         return {"result": []}
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        for provider in SEARCH_APIS:
-            try:
-                r = await client.get(provider + quote(q, safe=""))
-                if r.status_code == 200 and r.json():
-                    return r.json()
-            except Exception:
-                continue
+    async def call(client, provider):
+        try:
+            r=await client.get(provider+quote(query,safe=""))
+            if r.status_code!=200:
+                return None
+            data=r.json()
+            if data is None:
+                return None
+            return data
+        except Exception:
+            return None
 
-    raise HTTPException(502, "Search providers unavailable")
+    async with httpx.AsyncClient(timeout=httpx.Timeout(7.0,connect=3.0)) as client:
+        results=await asyncio.gather(*(call(client,p) for p in SEARCH_APIS))
+    for data in results:
+        if data is not None:
+            return data
+
+    raise HTTPException(502,"All search providers are currently unavailable")
 
 
 async def provider_audio_url(url: str):
