@@ -27,16 +27,23 @@ function updateDeviceStatus(){
   const nv=$("networkValue"),nl=$("networkLabel"); if(nv){nv.textContent=online?"Online":"Offline";nv.style.color=online?"#65d68a":"#ff6b6b";} if(nl)nl.textContent=online?"You are connected to the internet.":"No internet connection.";
   const cv=$("clockValue"),dv=$("dateValue"); if(cv)cv.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:ipTimezone||undefined}).format(new Date()); if(dv)dv.textContent=new Intl.DateTimeFormat([], {weekday:"long",year:"numeric",month:"long",day:"numeric",timeZone:ipTimezone||undefined}).format(new Date());
 }
+function bytes(v){const u=["B","KB","MB","GB","TB"];let n=Number(v)||0,i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return n.toFixed(i?2:0)+" "+u[i];}
 async function updateStorage(){
-  const el=$("storageValue");
   try{
-    if(navigator.storage&&navigator.storage.estimate){
-      const x=await navigator.storage.estimate(), used=x.usage||0, quota=x.quota||0;
-      const mb=n=>n/1024/1024;
-      el.textContent=mb(used).toFixed(2)+" MB / "+mb(quota).toFixed(0)+" MB";
-    }else el.textContent="Unavailable";
-  }catch{el.textContent="Unavailable";}
+    const r=await fetch("/api/system-status",{cache:"no-store"});
+    if(!r.ok)throw Error();
+    const d=await r.json();
+    $("storageValue").textContent=bytes(d.disk_used)+" / "+bytes(d.disk_total);
+    $("runtimeValue").textContent=formatRuntimeServer(d.uptime_seconds);
+    const ram=document.getElementById("ramValue");
+    if(ram)ram.textContent=bytes(d.ram_used)+" / "+bytes(d.ram_total);
+    const rl=document.getElementById("ramLabel");
+    if(rl)rl.textContent="Memory • "+d.ram_percent+"% used";
+    const sl=document.getElementById("storageLabel");
+    if(sl)sl.textContent="Platform disk • "+d.disk_percent+"% used";
+  }catch{}
 }
+function formatRuntimeServer(s){s=Math.max(0,Math.floor(Number(s)||0));const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60),sec=s%60;return (d?d+" days, ":"")+h+" hours, "+m+" minutes, "+sec+" seconds";}
 async function updateBattery(){
   const el=$("batteryStatus"), card=$("batteryValue"), label=$("batteryLabel");
   if(!navigator.getBattery){if(el)el.textContent="🔋 --%";if(card)card.textContent="--%";if(label)label.textContent="Battery API unavailable";return;}
@@ -49,6 +56,7 @@ async function updateBattery(){
 updateDeviceStatus();
 updateBattery();
 updateStorage();
+setInterval(updateStorage,10000);
 loadIpTimezone();
 setInterval(updateDeviceStatus,1000);
 window.addEventListener("online",updateDeviceStatus);
