@@ -2,33 +2,54 @@ const state={songs:[],current:-1,loading:false,playRequest:0,autoMood:true,recom
 const $=id=>document.getElementById(id);
 const audio=$("audioPlayer");
 
+let pageStarted=Date.now();
+let ipTimezone="";
+async function loadIpTimezone(){
+  try{
+    const r=await fetch("/api/timezone",{cache:"no-store"});
+    if(r.ok){const d=await r.json();ipTimezone=d.timezone||"";}
+  }catch{}
+}
+function formatRuntime(){
+  const s=Math.floor((Date.now()-pageStarted)/1000);
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  return h+" hours, "+m+" minutes, "+sec+" seconds";
+}
 function updateDeviceStatus(){
-  const network=$("networkStatus");
-  const battery=$("batteryStatus");
-  const time=$("timeStatus");
+  const network=$("networkStatus"), battery=$("batteryStatus"), time=$("timeStatus");
   const online=navigator.onLine;
   network.textContent=online?"● Online":"○ Offline";
   network.style.color=online?"#65d68a":"#ff6b6b";
-  time.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date());
+  time.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:ipTimezone||undefined}).format(new Date());
   const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
-  if(connection){
-    const type=connection.effectiveType||connection.type;
-    if(type) network.textContent=(online?"● ":"○ ")+String(type).toUpperCase();
-  }
+  if(connection&&connection.effectiveType) network.textContent=(online?"● ":"○ ")+connection.effectiveType.toUpperCase();
+  const rv=$("runtimeValue"); if(rv)rv.textContent=formatRuntime();
+  const nv=$("networkValue"),nl=$("networkLabel"); if(nv){nv.textContent=online?"Online":"Offline";nv.style.color=online?"#65d68a":"#ff6b6b";} if(nl)nl.textContent=online?"You are connected to the internet.":"No internet connection.";
+  const cv=$("clockValue"),dv=$("dateValue"); if(cv)cv.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:ipTimezone||undefined}).format(new Date()); if(dv)dv.textContent=new Intl.DateTimeFormat([], {weekday:"long",year:"numeric",month:"long",day:"numeric",timeZone:ipTimezone||undefined}).format(new Date());
+}
+async function updateStorage(){
+  const el=$("storageValue");
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const x=await navigator.storage.estimate(), used=x.usage||0, quota=x.quota||0;
+      const mb=n=>n/1024/1024;
+      el.textContent=mb(used).toFixed(2)+" MB / "+mb(quota).toFixed(0)+" MB";
+    }else el.textContent="Unavailable";
+  }catch{el.textContent="Unavailable";}
 }
 async function updateBattery(){
-  const el=$("batteryStatus");
-  if(!navigator.getBattery){el.textContent="🔋 --%";return;}
+  const el=$("batteryStatus"), card=$("batteryValue"), label=$("batteryLabel");
+  if(!navigator.getBattery){if(el)el.textContent="🔋 --%";if(card)card.textContent="--%";if(label)label.textContent="Battery API unavailable";return;}
   try{
     const b=await navigator.getBattery();
-    const set=()=>{el.textContent=(b.charging?"⚡ ":"🔋 ")+Math.round(b.level*100)+"%";};
-    set();
-    b.addEventListener("levelchange",set);
-    b.addEventListener("chargingchange",set);
-  }catch{el.textContent="🔋 --%";}
+    const set=()=>{const pct=Math.round(b.level*100),txt=(b.charging?"Charging":"Not charging");if(el)el.textContent=(b.charging?"⚡ ":"🔋 ")+pct+"%";if(card)card.textContent=pct+"%";if(label)label.textContent=txt+" • "+(100-pct)+"% remaining";};
+    set();b.addEventListener("levelchange",set);b.addEventListener("chargingchange",set);
+  }catch{if(card)card.textContent="--%";if(label)label.textContent="Unavailable";}
 }
 updateDeviceStatus();
 updateBattery();
+updateStorage();
+loadIpTimezone();
 setInterval(updateDeviceStatus,1000);
 window.addEventListener("online",updateDeviceStatus);
 window.addEventListener("offline",updateDeviceStatus);
