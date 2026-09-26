@@ -25,7 +25,6 @@ DOWNLOAD_APIS = [
     "https://valora-api.vercel.app/download/spotify?url="
 ]
 
-# 1. Frontend UI (Home Page with Black & Light Green Theme)
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     return """
@@ -34,7 +33,7 @@ async def read_root():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Roma Music</title>
+        <title>Roma Music Player</title>
         <style>
             body { 
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -42,6 +41,7 @@ async def read_root():
                 color: #ffffff; 
                 text-align: center; 
                 padding: 20px; 
+                margin-bottom: 100px;
             }
             h1 { color: #1ed760; margin-bottom: 20px; }
             .search-box { margin-bottom: 30px; }
@@ -82,17 +82,34 @@ async def read_root():
             }
             .song-card img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
             .details { text-align: left; margin-left: 15px; flex-grow: 1; }
-            .details strong { color: #fff; font-size: 15px; }
-            .details small { color: #b3b3b3; display: block; }
+            .details strong { color: #fff; font-size: 15px; display: block; }
+            .details small { color: #b3b3b3; }
+            .btn-group { display: flex; gap: 8px; }
             .song-card button {
                 background: transparent;
                 color: #1ed760;
                 border: 2px solid #1ed760;
-                padding: 8px 15px;
-                font-size: 14px;
+                padding: 6px 12px;
+                font-size: 13px;
                 border-radius: 20px;
             }
             .song-card button:hover { background: #1ed760; color: #000; }
+            
+            /* Fixed Audio Player at Bottom */
+            #player-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: #181818;
+                border-top: 2px solid #282828;
+                padding: 15px;
+                display: none;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+            }
+            audio { width: 60%; outline: none; }
         </style>
     </head>
     <body>
@@ -104,6 +121,12 @@ async def read_root():
         </div>
 
         <div id="results"></div>
+
+        <!-- Floating Music Player -->
+        <div id="player-container">
+            <span id="now-playing" style="color: #1ed760; font-weight: bold;">Playing: None</span>
+            <audio id="audioPlayer" controls></audio>
+        </div>
 
         <script>
             async function searchSongs() {
@@ -137,12 +160,41 @@ async def read_root():
                                 <strong>${title}</strong>
                                 <small>${artist}</small>
                             </div>
-                            <button onclick="getDownloadLink('${spotifyUrl}')">Download</button>
+                            <div class="btn-group">
+                                <button onclick="playSong('${spotifyUrl}', '${title}')">Play</button>
+                                <button onclick="getDownloadLink('${spotifyUrl}')">Download</button>
+                            </div>
                         `;
                         resultsDiv.appendChild(card);
                     });
                 } catch (error) {
                     resultsDiv.innerHTML = "<p style='color:red;'>Error fetching songs.</p>";
+                    console.error(error);
+                }
+            }
+
+            async function playSong(spotifyUrl, title) {
+                alert("Fetching song to play...");
+                try {
+                    const response = await fetch(`/api/download?url=${encodeURIComponent(spotifyUrl)}`);
+                    const data = await response.json();
+                    
+                    const audioUrl = data.download_link || data.download_url || data.result?.url;
+
+                    if (audioUrl) {
+                        const playerContainer = document.getElementById('player-container');
+                        const audioPlayer = document.getElementById('audioPlayer');
+                        const nowPlaying = document.getElementById('now-playing');
+
+                        nowPlaying.innerText = `Playing: ${title}`;
+                        audioPlayer.src = audioUrl;
+                        playerContainer.style.display = 'flex';
+                        audioPlayer.play();
+                    } else {
+                        alert("Play link not found!");
+                    }
+                } catch (error) {
+                    alert("Failed to play song.");
                     console.error(error);
                 }
             }
@@ -170,7 +222,6 @@ async def read_root():
     </html>
     """
 
-# 2. Backend Search API (with Fallback)
 @app.get("/api/search")
 async def search_songs(q: str):
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -186,7 +237,6 @@ async def search_songs(q: str):
         
         raise HTTPException(status_code=500, detail="Ella Search API-kalum down aanu!")
 
-# 3. Backend Download API (with Fallback)
 @app.get("/api/download")
 async def download_song(url: str):
     async with httpx.AsyncClient(timeout=10.0) as client:
