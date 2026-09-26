@@ -33,6 +33,7 @@
       <div class="search-wrap">
         <span class="search-icon">⌕</span>
         <input id="searchInput" type="search" autocomplete="off" placeholder="Songs, artists, albums...">
+        <button id="playlistToggle" class="playlist-toggle" type="button" aria-pressed="false">♫ Playlist</button>
         <button id="searchButton" class="search-button">Search</button>
       </div>
     </section>
@@ -55,6 +56,14 @@
     </section>
 
     <section class="results-section search-results-section">
+      <div id="playlistHeader" class="playlist-header hidden">
+        <img id="playlistCover" src="" alt="">
+        <div>
+          <p>PLAYLIST</p>
+          <h2 id="playlistTitle">Spotify Playlist</h2>
+          <span id="playlistMeta"></span>
+        </div>
+      </div>
       <div class="section-head">
         <h2 id="resultsTitle">Search results</h2>
         <span id="resultCount"></span>
@@ -106,6 +115,6 @@
   </div>
 
   <audio id="audioPlayer" preload="metadata"></audio>
-  <script src="/static/app.js?v=20260927-4"></script>
+  <script src="/static/app.js?v=20260927-5"></script>
 </body>
 </html>
