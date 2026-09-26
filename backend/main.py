@@ -229,10 +229,18 @@ async def stream(source_url: str):
             str(TEMP_DIR),
             safe_filename,
         )
+        if not target.exists() or target.stat().st_size == 0:
+            raise RuntimeError("Mega download produced an empty audio file")
+
+        # Keep the response inline so the HTML audio element can consume it
+        # as media instead of treating it as a forced download.
         return FileResponse(
             target,
             media_type="audio/mpeg",
-            filename=safe_filename,
+            headers={
+                "Content-Disposition": f'inline; filename="{safe_filename}"',
+                "Cache-Control": "public, max-age=3600",
+            },
             background=BackgroundTask(lambda: target.unlink(missing_ok=True)),
         )
     except Exception as exc:
