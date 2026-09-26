@@ -241,5 +241,14 @@ async function playFeatured(index){
   if(!song.url){ try{ const r=await fetch("/api/search?q="+encodeURIComponent(song.title+" "+song.artist)); if(!r.ok)throw Error(); const items=normalize(await r.json()); if(items[0]){song={...song,...items[0],title:song.title,artist:song.artist};state.featured[index]=song;renderFeatured();} }catch{alert("This track could not be loaded right now.");return;} }
   if(!song.url)return; state.songs=state.featured.filter(s=>s.url); render(); const n=state.songs.findIndex(s=>s.url===song.url); if(n>=0)play(n);
 }
-\nupdateDeviceStatus();\nupdateBattery();\nupdateStorage();\nloadIpTimezone();\nsetInterval(updateDeviceStatus,1000);\nsetInterval(updateStorage,15000);\nwindow.addEventListener("online",updateDeviceStatus);\nwindow.addEventListener("offline",updateDeviceStatus);\n
+
+updateDeviceStatus();
+updateBattery();
+updateStorage();
+loadIpTimezone();
+setInterval(updateDeviceStatus,1000);
+setInterval(updateStorage,15000);
+window.addEventListener("online",updateDeviceStatus);
+window.addEventListener("offline",updateDeviceStatus);
+
 loadFeatured();
