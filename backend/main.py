@@ -1,9 +1,11 @@
+from pathlib import Path
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-import httpx
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()
+app = FastAPI(title="Roma Music API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,214 +18,27 @@ app.add_middleware(
 SEARCH_APIS = [
     "https://jerrycoder.oggyapi.workers.dev/search/spotify?q=",
     "https://api.nexray.eu.cc/search/spotify?q=",
-    "https://zellrayy.com/search/spotify?q="
+    "https://zellrayy.com/search/spotify?q=",
 ]
 
 DOWNLOAD_APIS = [
     "https://jerrycoder.oggyapi.workers.dev/down/spotify?url=",
     "https://api.nexray.eu.cc/downloader/spotify?url=",
-    "https://valora-api.vercel.app/download/spotify?url="
+    "https://valora-api.vercel.app/download/spotify?url=",
 ]
 
-@app.get("/", response_class=HTMLResponse)
+ROOT = Path(__file__).resolve().parent.parent
+FRONTEND = ROOT / "frontend"
+app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+
+@app.get("/")
 async def read_root():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Roma Music Player</title>
-        <style>
-            body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                background: #0f0f0f; 
-                color: #ffffff; 
-                text-align: center; 
-                padding: 20px; 
-                margin-bottom: 100px;
-            }
-            h1 { color: #1ed760; margin-bottom: 20px; }
-            .search-box { margin-bottom: 30px; }
-            input { 
-                padding: 12px 15px; 
-                width: 300px; 
-                border-radius: 25px; 
-                border: 2px solid #222; 
-                background: #181818;
-                color: #fff;
-                font-size: 16px;
-                outline: none;
-            }
-            input:focus { border-color: #1ed760; }
-            button { 
-                padding: 12px 25px; 
-                background: #1ed760; 
-                color: #000; 
-                font-weight: bold;
-                border: none; 
-                border-radius: 25px; 
-                cursor: pointer; 
-                font-size: 16px;
-                margin-left: 10px;
-            }
-            button:hover { background: #1faa50; }
-            .song-card { 
-                background: #181818; 
-                border: 1px solid #282828;
-                margin: 12px auto; 
-                padding: 12px; 
-                width: 90%;
-                max-width: 500px; 
-                border-radius: 12px; 
-                display: flex; 
-                align-items: center; 
-                justify-content: space-between; 
-            }
-            .song-card img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
-            .details { text-align: left; margin-left: 15px; flex-grow: 1; }
-            .details strong { color: #fff; font-size: 15px; display: block; }
-            .details small { color: #b3b3b3; }
-            .btn-group { display: flex; gap: 8px; }
-            .song-card button {
-                background: transparent;
-                color: #1ed760;
-                border: 2px solid #1ed760;
-                padding: 6px 12px;
-                font-size: 13px;
-                border-radius: 20px;
-            }
-            .song-card button:hover { background: #1ed760; color: #000; }
-            
-            /* Fixed Audio Player at Bottom */
-            #player-container {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                background: #181818;
-                border-top: 2px solid #282828;
-                padding: 15px;
-                display: none;
-                justify-content: center;
-                align-items: center;
-                gap: 20px;
-            }
-            audio { width: 60%; outline: none; }
-        </style>
-    </head>
-    <body>
-
-        <h1>Roma Music</h1>
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Search songs, artists...">
-            <button onclick="searchSongs()">Search</button>
-        </div>
-
-        <div id="results"></div>
-
-        <!-- Floating Music Player -->
-        <div id="player-container">
-            <span id="now-playing" style="color: #1ed760; font-weight: bold;">Playing: None</span>
-            <audio id="audioPlayer" controls></audio>
-        </div>
-
-        <script>
-            async function searchSongs() {
-                const query = document.getElementById('searchInput').value;
-                const resultsDiv = document.getElementById('results');
-                resultsDiv.innerHTML = "<p style='color:#b3b3b3;'>Searching...</p>";
-
-                try {
-                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-                    const data = await response.json();
-
-                    resultsDiv.innerHTML = "";
-                    const tracks = data.result || data.tracks || [];
-
-                    if(tracks.length === 0) {
-                        resultsDiv.innerHTML = "<p>No songs found!</p>";
-                        return;
-                    }
-
-                    tracks.forEach(track => {
-                        const title = track.title || track.name || track.trackName;
-                        const artist = track.artist;
-                        const thumbnail = track.thumbnail || track.cover || track.image;
-                        const spotifyUrl = track.url || track.spotifyUrl;
-
-                        const card = document.createElement('div');
-                        card.className = 'song-card';
-                        card.innerHTML = `
-                            <img src="${thumbnail}" alt="Cover">
-                            <div class="details">
-                                <strong>${title}</strong>
-                                <small>${artist}</small>
-                            </div>
-                            <div class="btn-group">
-                                <button onclick="playSong('${spotifyUrl}', '${title}')">Play</button>
-                                <button onclick="getDownloadLink('${spotifyUrl}')">Download</button>
-                            </div>
-                        `;
-                        resultsDiv.appendChild(card);
-                    });
-                } catch (error) {
-                    resultsDiv.innerHTML = "<p style='color:red;'>Error fetching songs.</p>";
-                    console.error(error);
-                }
-            }
-
-            async function playSong(spotifyUrl, title) {
-                alert("Fetching song to play...");
-                try {
-                    const response = await fetch(`/api/download?url=${encodeURIComponent(spotifyUrl)}`);
-                    const data = await response.json();
-                    
-                    const audioUrl = data.download_link || data.download_url || data.result?.url;
-
-                    if (audioUrl) {
-                        const playerContainer = document.getElementById('player-container');
-                        const audioPlayer = document.getElementById('audioPlayer');
-                        const nowPlaying = document.getElementById('now-playing');
-
-                        nowPlaying.innerText = `Playing: ${title}`;
-                        audioPlayer.src = audioUrl;
-                        playerContainer.style.display = 'flex';
-                        audioPlayer.play();
-                    } else {
-                        alert("Play link not found!");
-                    }
-                } catch (error) {
-                    alert("Failed to play song.");
-                    console.error(error);
-                }
-            }
-
-            async function getDownloadLink(spotifyUrl) {
-                alert("Fetching download link...");
-                try {
-                    const response = await fetch(`/api/download?url=${encodeURIComponent(spotifyUrl)}`);
-                    const data = await response.json();
-                    
-                    const downloadUrl = data.download_link || data.download_url || data.result?.url;
-
-                    if (downloadUrl) {
-                        window.open(downloadUrl, '_blank');
-                    } else {
-                        alert("Download link not found!");
-                    }
-                } catch (error) {
-                    alert("Failed to get download link.");
-                    console.error(error);
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
+    return FileResponse(FRONTEND / "index.html")
 
 @app.get("/api/search")
 async def search_songs(q: str):
+    if not q.strip():
+        return {"result": []}
     async with httpx.AsyncClient(timeout=10.0) as client:
         for api_url in SEARCH_APIS:
             try:
@@ -234,12 +49,13 @@ async def search_songs(q: str):
                         return data
             except Exception:
                 continue
-        
-        raise HTTPException(status_code=500, detail="Ella Search API-kalum down aanu!")
+    raise HTTPException(status_code=502, detail="Search providers unavailable")
 
 @app.get("/api/download")
 async def download_song(url: str):
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    if not url.strip():
+        raise HTTPException(status_code=400, detail="Song URL is required")
+    async with httpx.AsyncClient(timeout=15.0) as client:
         for api_url in DOWNLOAD_APIS:
             try:
                 response = await client.get(f"{api_url}{url}")
@@ -249,5 +65,4 @@ async def download_song(url: str):
                         return data
             except Exception:
                 continue
-        
-        raise HTTPException(status_code=500, detail="Ella Download API-kalum down aanu!")
+    raise HTTPException(status_code=502, detail="Download providers unavailable")
