@@ -43,7 +43,7 @@ function updateDeviceStatus(){
   if(cv)cv.textContent=parts.time;
   if(dv)dv.textContent=parts.date;
 }
-async async function updateStorage(){
+async function updateStorage(){
   try{
     const r=await fetch("/api/status",{cache:"no-store"});
     if(!r.ok)throw Error();
@@ -88,7 +88,7 @@ function featuredCard(song,index){
 function renderFeatured(){
   const box=$("featuredResults");
   box.innerHTML=state.featured.map(featuredCard).join("");
-  $("featuredLoading").classList.add("hidden");
+  const loading=$("featuredLoading");if(loading)loading.classList.add("hidden");
   $("featuredCount").textContent=FEATURED.length+" tracks";
 }
 async function resolveFeatured(){
