@@ -220,10 +220,12 @@ async def stream(source_url: str):
     target = TEMP_DIR / safe_filename
 
     try:
-        public_link = mega.get_link(("cached", cached))
+        # Download the private Mega node directly. Creating a public
+        # Mega share link is unnecessary and can fail for account files.
+        # mega.py expects the normal find()/node tuple shape here.
         await asyncio.to_thread(
-            mega.download_url,
-            public_link,
+            mega.download,
+            ("cached", cached),
             str(TEMP_DIR),
             safe_filename,
         )
