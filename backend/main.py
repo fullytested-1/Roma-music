@@ -35,6 +35,10 @@ DOWNLOAD_APIS = [
     "https://api.nexray.eu.cc/downloader/spotify?url=",
     "https://valora-api.vercel.app/download/spotify?url=",
 ]
+PLAYLIST_APIS = [
+    "https://api.kangwifi.eu.org/search/spotify-playlist?url=",
+    "https://api.nexadev.my.id/api/spotify?url=",
+]
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
