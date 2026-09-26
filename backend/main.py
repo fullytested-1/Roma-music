@@ -136,6 +136,25 @@ async def system_status():
         "disk_percent":round(disk_percent,1),
     }
 
+@app.get("/api/status")
+async def platform_status():
+    try:
+        import psutil
+        memory=psutil.virtual_memory()
+        disk=shutil.disk_usage(str(ROOT))
+        boot=time.time()-psutil.boot_time()
+        return {
+            "runtime_seconds": int(boot),
+            "ram_used": memory.used,
+            "ram_total": memory.total,
+            "ram_percent": memory.percent,
+            "storage_used": disk.used,
+            "storage_total": disk.total,
+            "storage_free": disk.free,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
 @app.get("/api/timezone")
 async def timezone(request: Request):
     forwarded=request.headers.get("x-forwarded-for","")
