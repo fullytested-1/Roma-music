@@ -16,9 +16,10 @@ from urllib.parse import quote
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from mega import Mega
+from starlette.background import BackgroundTask
 
 app = FastAPI(title="Roma Music API")
 app.add_middleware(
@@ -52,9 +53,17 @@ MEGA_FOLDER = os.getenv("MEGA_FOLDER", "RomaMusic")
 
 
 def mega_client():
+    global _mega
     if not MEGA_EMAIL or not MEGA_PASSWORD:
         raise HTTPException(500, "Mega credentials are not configured")
-    return Mega().login(MEGA_EMAIL, MEGA_PASSWORD)
+    if _mega is None:
+        try:
+            _mega = Mega().login(MEGA_EMAIL, MEGA_PASSWORD)
+        except Exception as exc:
+            raise HTTPException(502, f"Mega login failed: {exc}")
+    return _mega
+
+_mega = None
 
 
 def safe_name(title: str, artist: str, source_url: str) -> str:
@@ -132,7 +141,7 @@ async def download(
     if cached:
         try:
             return {
-                "download_url": mega.get_upload_link(cached),
+                "stream_url": f"/api/stream?source_url={quote(url, safe='')}",
                 "cached": True,
                 "title": title,
                 "artist": artist,
@@ -157,9 +166,8 @@ async def download(
                         out.write(chunk)
 
         uploaded = mega.upload(str(temp_path), folder[0] if isinstance(folder, list) else folder)
-        link = mega.get_upload_link(uploaded)
         return {
-            "download_url": link,
+            "stream_url": f"/api/stream?source_url={quote(url, safe='')}",
             "cached": False,
             "title": title,
             "artist": artist,
@@ -169,3 +177,37 @@ async def download(
         raise HTTPException(502, f"Mega storage failed: {exc}")
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+@app.get("/api/stream")
+async def stream(source_url: str):
+    """Serve a cached Mega file as actual audio bytes."""
+    if not source_url.strip():
+        raise HTTPException(400, "Source URL is required")
+
+    mega = mega_client()
+    cached = find_cached_song(mega, None, source_url)
+    if not cached:
+        raise HTTPException(404, "Cached song not found")
+
+    filename = cached.get("name") or "song.mp3"
+    safe_filename = re.sub(r"[^a-zA-Z0-9._-]+", "_", filename)
+    target = TEMP_DIR / safe_filename
+
+    try:
+        public_link = mega.get_link(("cached", cached))
+        await asyncio.to_thread(
+            mega.download_url,
+            public_link,
+            str(TEMP_DIR),
+            safe_filename,
+        )
+        return FileResponse(
+            target,
+            media_type="audio/mpeg",
+            filename=safe_filename,
+            background=BackgroundTask(lambda: target.unlink(missing_ok=True)),
+        )
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        raise HTTPException(502, f"Mega playback failed: {exc}")
