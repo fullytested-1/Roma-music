@@ -43,17 +43,27 @@ function updateDeviceStatus(){
   if(cv)cv.textContent=parts.time;
   if(dv)dv.textContent=parts.date;
 }
-async function updateStorage(){
-  const el=$("storageValue");
+async async function updateStorage(){
   try{
-    if(navigator.storage&&typeof navigator.storage.estimate==="function"){
-      const x=await navigator.storage.estimate(),used=x.usage||0,quota=x.quota||0;
-      const mb=n=>n/1024/1024;
-      el.textContent=mb(used).toFixed(2)+" MB / "+(quota?mb(quota).toFixed(0)+" MB":"—");
-    }else{
-      el.textContent="Browser storage";
+    const r=await fetch("/api/status",{cache:"no-store"});
+    if(!r.ok)throw Error();
+    const d=await r.json();
+    const mb=n=>n/1024/1024/1024;
+    const ram=$("ramValue"),ramLabel=$("ramLabel");
+    if(ram)ram.textContent=mb(d.ram_used).toFixed(2)+" GB / "+mb(d.ram_total).toFixed(2)+" GB";
+    if(ramLabel)ramLabel.textContent="Platform memory • "+Number(d.ram_percent||0).toFixed(1)+"% used";
+    const storage=$("storageValue");
+    if(storage)storage.textContent=mb(d.storage_used).toFixed(2)+" GB / "+mb(d.storage_total).toFixed(2)+" GB";
+    const runtime=$("runtimeValue");
+    if(runtime&&Number.isFinite(d.runtime_seconds)){
+      const s=Math.max(0,Math.floor(d.runtime_seconds)),days=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),sec=s%60;
+      runtime.textContent=(days?days+" days, ":"")+h+" hours, "+m+" minutes, "+sec+" seconds";
     }
-  }catch{el.textContent="Browser storage";}
+  }catch{
+    const ram=$("ramValue"),label=$("ramLabel");
+    if(ram)ram.textContent="Unavailable";
+    if(label)label.textContent="Platform metrics unavailable";
+  }
 }
 async function updateBattery(){
   const el=$("batteryStatus"),card=$("batteryValue"),label=$("batteryLabel");
@@ -230,5 +240,5 @@ async function playFeatured(index){
   if(!song.url){ try{ const r=await fetch("/api/search?q="+encodeURIComponent(song.title+" "+song.artist)); if(!r.ok)throw Error(); const items=normalize(await r.json()); if(items[0]){song={...song,...items[0],title:song.title,artist:song.artist};state.featured[index]=song;renderFeatured();} }catch{alert("This track could not be loaded right now.");return;} }
   if(!song.url)return; state.songs=state.featured.filter(s=>s.url); render(); const n=state.songs.findIndex(s=>s.url===song.url); if(n>=0)play(n);
 }
-
+\nupdateDeviceStatus();\nupdateBattery();\nupdateStorage();\nloadIpTimezone();\nsetInterval(updateDeviceStatus,1000);\nsetInterval(updateStorage,15000);\nwindow.addEventListener("online",updateDeviceStatus);\nwindow.addEventListener("offline",updateDeviceStatus);\n
 loadFeatured();
