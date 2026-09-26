@@ -16,9 +16,13 @@ from urllib.parse import quote
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from mega import Mega
+from mega.crypto import a32_to_str, get_chunks
+from Crypto.Cipher import AES
+from Crypto.Util import Counter
+import requests
 from starlette.background import BackgroundTask
 
 app = FastAPI(title="Roma Music API")
@@ -64,6 +68,7 @@ def mega_client():
     return _mega
 
 _mega = None
+_cached_nodes = {}
 
 
 def safe_name(title: str, artist: str, source_url: str) -> str:
@@ -74,12 +79,14 @@ def safe_name(title: str, artist: str, source_url: str) -> str:
 
 def find_cached_song(mega, folder, source_url: str):
     digest = __import__("hashlib").sha256(source_url.encode()).hexdigest()[:16]
+    if digest in _cached_nodes:
+        return _cached_nodes[digest]
+
     files = mega.get_files()
     for _, node in files.items():
-        # mega.py stores the decrypted filename under node["a"]["n"],
-        # not node["name"].
         node_name = (node.get("a") or {}).get("n") or node.get("name") or ""
         if node.get("t") == 0 and node_name.endswith(f"-{digest}.mp3"):
+            _cached_nodes[digest] = node
             return node
     return None
 
@@ -194,6 +201,14 @@ async def download(
         if not uploaded:
             raise RuntimeError("Mega upload returned no file node")
 
+        # Refresh once after upload and keep the processed Mega node in memory
+        # so the next play request does not call get_files() again.
+        cached_after_upload = await asyncio.to_thread(
+            find_cached_song, mega, folder_id, url
+        )
+        if not cached_after_upload:
+            raise RuntimeError("Mega upload completed but cached file was not found")
+
         return {
             "stream_url": f"/api/stream?source_url={quote(url, safe='')}",
             "cached": False,
@@ -209,7 +224,8 @@ async def download(
 
 @app.get("/api/stream")
 async def stream(source_url: str):
-    """Serve a cached Mega file as actual audio bytes."""
+    """Stream and decrypt a cached Mega file as audio without waiting for the
+    complete file to download to Render first."""
     if not source_url.strip():
         raise HTTPException(400, "Source URL is required")
 
@@ -218,34 +234,54 @@ async def stream(source_url: str):
     if not cached:
         raise HTTPException(404, "Cached song not found")
 
-    filename = cached.get("name") or "song.mp3"
+    filename = (cached.get("a") or {}).get("n") or "song.mp3"
     safe_filename = re.sub(r"[^a-zA-Z0-9._-]+", "_", filename)
-    target = TEMP_DIR / safe_filename
+    file_handle = cached["h"]
+    key = cached["k"]
+    iv = cached["iv"]
 
-    try:
-        # Download the private Mega node directly. Creating a public
-        # Mega share link is unnecessary and can fail for account files.
-        # mega.py expects the normal find()/node tuple shape here.
-        await asyncio.to_thread(
-            mega.download,
-            ("cached", cached),
-            str(TEMP_DIR),
-            safe_filename,
-        )
-        if not target.exists() or target.stat().st_size == 0:
-            raise RuntimeError("Mega download produced an empty audio file")
+    def decrypted_chunks():
+        response = None
+        try:
+            # Ask Mega for its temporary encrypted CDN URL.
+            file_data = mega._api_request({"a": "g", "g": 1, "n": file_handle})
+            file_url = file_data["g"]
+            file_size = int(file_data["s"])
 
-        # Keep the response inline so the HTML audio element can consume it
-        # as media instead of treating it as a forced download.
-        return FileResponse(
-            target,
-            media_type="audio/mpeg",
-            headers={
-                "Content-Disposition": f'inline; filename="{safe_filename}"',
-                "Cache-Control": "public, max-age=3600",
-            },
-            background=BackgroundTask(lambda: target.unlink(missing_ok=True)),
-        )
-    except Exception as exc:
-        target.unlink(missing_ok=True)
-        raise HTTPException(502, f"Mega playback failed: {exc}")
+            response = requests.get(
+                file_url,
+                stream=True,
+                timeout=60,
+                headers={"Accept-Encoding": "identity"},
+            )
+            response.raise_for_status()
+
+            counter = Counter.new(
+                128,
+                initial_value=((iv[0] << 32) + iv[1]) << 64,
+            )
+            aes = AES.new(a32_to_str(key), AES.MODE_CTR, counter=counter)
+
+            remaining = file_size
+            for _, chunk_size in get_chunks(file_size).items():
+                if remaining <= 0:
+                    break
+                encrypted = response.raw.read(chunk_size)
+                if not encrypted:
+                    break
+                plaintext = aes.decrypt(encrypted)
+                remaining -= len(plaintext)
+                yield plaintext
+        finally:
+            if response is not None:
+                response.close()
+
+    return StreamingResponse(
+        decrypted_chunks(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_filename}"',
+            "Cache-Control": "public, max-age=3600",
+            "Accept-Ranges": "none",
+        },
+    )
