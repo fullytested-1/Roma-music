@@ -198,6 +198,65 @@ async def search(q: str):
     raise HTTPException(502,"All search providers are currently unavailable")
 
 
+async def playlist_search(url: str):
+    playlist_url=url.strip()
+    if not playlist_url:
+        raise HTTPException(400, "Spotify playlist URL is required")
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
+        for provider in PLAYLIST_APIS:
+            try:
+                r=await client.get(provider + quote(playlist_url, safe=""))
+                if r.status_code != 200:
+                    continue
+                data=r.json()
+                result=data.get("result") if isinstance(data, dict) else None
+                meta=result if isinstance(result, dict) and isinstance(result.get("tracks"), list) else (data.get("data") if isinstance(data, dict) else {})
+                tracks=(result or {}).get("tracks", []) if isinstance(result, dict) else []
+                if not tracks and isinstance(data, dict):
+                    tracks=data.get("tracks", [])
+                if not isinstance(meta, dict):
+                    meta={}
+                if not isinstance(tracks, list) or not tracks:
+                    continue
+
+                normalized=[]
+                for t in tracks:
+                    if not isinstance(t, dict):
+                        continue
+                    track_url=t.get("url") or t.get("spotifyUrl") or t.get("link") or ""
+                    if not track_url:
+                        continue
+                    normalized.append({
+                        "title": t.get("title") or t.get("name") or "Unknown song",
+                        "artist": t.get("artist") or t.get("artists") or "Unknown artist",
+                        "thumbnail": t.get("thumbnail") or t.get("cover") or t.get("image") or meta.get("cover") or "",
+                        "duration": t.get("duration") or "",
+                        "durationMs": t.get("durationMs") or 0,
+                        "id": t.get("id") or "",
+                        "url": track_url,
+                    })
+
+                if normalized:
+                    return {
+                        "type": "playlist",
+                        "id": meta.get("id") or "",
+                        "name": meta.get("name") or meta.get("title") or "Spotify Playlist",
+                        "owner": meta.get("owner") or "",
+                        "cover": meta.get("cover") or "",
+                        "total": meta.get("total") or len(normalized),
+                        "count": len(normalized),
+                        "tracks": normalized,
+                    }
+            except Exception:
+                continue
+
+    raise HTTPException(502, "Playlist providers are currently unavailable")
+
+@app.get("/api/playlist")
+async def playlist(url: str):
+    return await playlist_search(url)
+
 async def provider_audio_url(url: str):
     async with httpx.AsyncClient(timeout=20) as client:
         for provider in DOWNLOAD_APIS:
