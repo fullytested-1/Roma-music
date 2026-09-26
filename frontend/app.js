@@ -10,6 +10,18 @@ async function loadIpTimezone(){
     if(r.ok){const d=await r.json();ipTimezone=d.timezone||"";}
   }catch{}
 }
+function getDateParts(){
+  const options={hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false};
+  const dateOptions={weekday:"long",year:"numeric",month:"long",day:"numeric"};
+  try{
+    return {
+      time:new Intl.DateTimeFormat(undefined,{...options,timeZone:ipTimezone||undefined}).format(new Date()),
+      date:new Intl.DateTimeFormat(undefined,{...dateOptions,timeZone:ipTimezone||undefined}).format(new Date())
+    };
+  }catch{
+    return {time:new Date().toLocaleTimeString(),date:new Date().toLocaleDateString()};
+  }
+}
 function formatRuntime(){
   const s=Math.floor((Date.now()-pageStarted)/1000);
   const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
@@ -17,52 +29,42 @@ function formatRuntime(){
 }
 function updateDeviceStatus(){
   const network=$("networkStatus"), battery=$("batteryStatus"), time=$("timeStatus");
-  const online=navigator.onLine;
-  network.textContent=online?"● Online":"○ Offline";
-  network.style.color=online?"#65d68a":"#ff6b6b";
-  time.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:ipTimezone||undefined}).format(new Date());
+  const online=navigator.onLine !== false;
+  if(network){network.textContent=online?"● Online":"○ Offline";network.style.color=online?"#65d68a":"#ff6b6b";}
   const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
-  if(connection&&connection.effectiveType) network.textContent=(online?"● ":"○ ")+connection.effectiveType.toUpperCase();
-  const rv=$("runtimeValue"); if(rv)rv.textContent=formatRuntime();
-  const nv=$("networkValue"),nl=$("networkLabel"); if(nv){nv.textContent=online?"Online":"Offline";nv.style.color=online?"#65d68a":"#ff6b6b";} if(nl)nl.textContent=online?"You are connected to the internet.":"No internet connection.";
-  const cv=$("clockValue"),dv=$("dateValue"); if(cv)cv.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:ipTimezone||undefined}).format(new Date()); if(dv)dv.textContent=new Intl.DateTimeFormat([], {weekday:"long",year:"numeric",month:"long",day:"numeric",timeZone:ipTimezone||undefined}).format(new Date());
+  if(connection&&connection.effectiveType&&network)network.textContent=(online?"● ":"○ ")+String(connection.effectiveType).toUpperCase();
+  const parts=getDateParts();
+  if(time)time.textContent=parts.time;
+  const rv=$("runtimeValue");if(rv)rv.textContent=formatRuntime();
+  const nv=$("networkValue"),nl=$("networkLabel");
+  if(nv){nv.textContent=online?"Online":"Offline";nv.style.color=online?"#65d68a":"#ff6b6b";}
+  if(nl)nl.textContent=online?"You are connected to the internet.":"No internet connection.";
+  const cv=$("clockValue"),dv=$("dateValue");
+  if(cv)cv.textContent=parts.time;
+  if(dv)dv.textContent=parts.date;
 }
-function bytes(v){const u=["B","KB","MB","GB","TB"];let n=Number(v)||0,i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return n.toFixed(i?2:0)+" "+u[i];}
 async function updateStorage(){
+  const el=$("storageValue");
   try{
-    const r=await fetch("/api/system-status",{cache:"no-store"});
-    if(!r.ok)throw Error();
-    const d=await r.json();
-    $("storageValue").textContent=bytes(d.disk_used)+" / "+bytes(d.disk_total);
-    $("runtimeValue").textContent=formatRuntimeServer(d.uptime_seconds);
-    const ram=document.getElementById("ramValue");
-    if(ram)ram.textContent=bytes(d.ram_used)+" / "+bytes(d.ram_total);
-    const rl=document.getElementById("ramLabel");
-    if(rl)rl.textContent="Memory • "+d.ram_percent+"% used";
-    const sl=document.getElementById("storageLabel");
-    if(sl)sl.textContent="Platform disk • "+d.disk_percent+"% used";
-  }catch{}
+    if(navigator.storage&&typeof navigator.storage.estimate==="function"){
+      const x=await navigator.storage.estimate(),used=x.usage||0,quota=x.quota||0;
+      const mb=n=>n/1024/1024;
+      el.textContent=mb(used).toFixed(2)+" MB / "+(quota?mb(quota).toFixed(0)+" MB":"—");
+    }else{
+      el.textContent="Browser storage";
+    }
+  }catch{el.textContent="Browser storage";}
 }
-function formatRuntimeServer(s){s=Math.max(0,Math.floor(Number(s)||0));const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60),sec=s%60;return (d?d+" days, ":"")+h+" hours, "+m+" minutes, "+sec+" seconds";}
 async function updateBattery(){
-  const el=$("batteryStatus"), card=$("batteryValue"), label=$("batteryLabel");
-  if(!navigator.getBattery){if(el)el.textContent="🔋 --%";if(card)card.textContent="--%";if(label)label.textContent="Battery API unavailable";return;}
+  const el=$("batteryStatus"),card=$("batteryValue"),label=$("batteryLabel");
+  if(!navigator.getBattery){if(el)el.textContent="🔋 --%";if(card)card.textContent="--%";if(label)label.textContent="Not supported by this browser";return;}
   try{
     const b=await navigator.getBattery();
-    const set=()=>{const pct=Math.round(b.level*100),txt=(b.charging?"Charging":"Not charging");if(el)el.textContent=(b.charging?"⚡ ":"🔋 ")+pct+"%";if(card)card.textContent=pct+"%";if(label)label.textContent=txt+" • "+(100-pct)+"% remaining";};
+    const set=()=>{const pct=Math.round(b.level*100),txt=b.charging?"Charging":"Not charging";if(el)el.textContent=(b.charging?"⚡ ":"🔋 ")+pct+"%";if(card)card.textContent=pct+"%";if(label)label.textContent=txt+" • "+(100-pct)+"% remaining";};
     set();b.addEventListener("levelchange",set);b.addEventListener("chargingchange",set);
-  }catch{if(card)card.textContent="--%";if(label)label.textContent="Unavailable";}
+  }catch{if(card)card.textContent="--%";if(label)label.textContent="Not supported by this browser";}
 }
-updateDeviceStatus();
-updateBattery();
-updateStorage();
-setInterval(updateStorage,10000);
-loadIpTimezone();
-setInterval(updateDeviceStatus,1000);
-window.addEventListener("online",updateDeviceStatus);
-window.addEventListener("offline",updateDeviceStatus);
 
-function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 function normalize(data){const raw=data?.result||data?.tracks||data?.data||[];return (Array.isArray(raw)?raw:[]).map(t=>({title:t.title||t.name||t.trackName||"Unknown song",artist:t.artist||t.artists||"Unknown artist",thumbnail:t.thumbnail||t.cover||t.image||"",url:t.url||t.spotifyUrl||t.link||"",duration:t.duration||0})).filter(s=>s.url);}
 function featuredCard(song,index){
   const thumb=song.thumbnail||"";
