@@ -45,12 +45,33 @@ function loadFeatured(){
   renderFeatured();
   resolveFeatured();
 }
-function playFeatured(index){
-  const song=state.featured[index];
-  if(!song?.url)return;
+async function playFeatured(index){
+  let song=state.featured[index];
+  if(!song)return;
+  if(!song.url){
+    try{
+      const r=await fetch("/api/search?q="+encodeURIComponent(song.title+" "+song.artist));
+      if(!r.ok)throw Error();
+      const items=normalize(await r.json());
+      if(items[0]){
+        song={...song,...items[0],title:song.title,artist:song.artist};
+        state.featured[index]=song;
+        renderFeatured();
+      }
+    }catch{
+      alert("This track could not be loaded right now.");
+      return;
+    }
+  }
+  if(!song.url)return;
   const existing=state.songs.findIndex(s=>s.url===song.url);
   if(existing>=0)play(existing);
-  else{state.songs=[...state.featured];render();const n=state.songs.findIndex(s=>s.url===song.url);play(n>=0?n:0)}
+  else{
+    state.songs=[...state.featured.filter(s=>s.url)];
+    render();
+    const n=state.songs.findIndex(s=>s.url===song.url);
+    if(n>=0)play(n);
+  }
 }
 function render(){
   const box=$("results");box.innerHTML="";
