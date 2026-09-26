@@ -1,8 +1,6 @@
 const state={songs:[],current:-1,loading:false,playRequest:0,autoMood:true,recommending:false,featured:[],featuredLoaded:false};
 const $=id=>document.getElementById(id);
 const audio=$("audioPlayer");
-const FEATURED=[["sorry i like you","burbank"],["Affection","Jinsang"],["Feather","Nujabes"],["5:32 PM","The Deli"],["This Is What Falling in Love Feels Like (Lofi)","JVKE"],["controlla","Idealism"],["Losing Interest","Itssvd feat. Shiloh Dynasty"],["I'm Closing My Eyes","Potsu feat. Shiloh Dynasty"],["Walk But In A Garden",".yu-utsu"],["Warm Glow","Hippo Campus"],["Iktara (Lofi Flip)","VIBIE & Amit Trivedi"],["Zara Zara (Lofi)","Bombay Jayashri"],["Jeene Laga Hoon (Lofi Mix)","Atif Aslam"],["Mehrama (Lofi Flip)","Darshan Raval & Silent Ocean"],["Heeriye (Lofi Mix)","Arijit Singh & Jasleen Royal"],["Hosanna (Lofi Flip)","Leon D'souza"],["Pehla Nasha (LoFi)","Udit Narayan"],["Tum Mile (Lofi Flip)","Pritam"],["Kabira (Lofi Reprise)","Tochi Raina & Rekha Bhardwaj"],["Channa Mereya (Lofi Chill)","Arijit Singh"],["Agar Tum Saath Ho (Lofi Flip)","Alka Yagnik & Arijit Singh"],["Tum Hi Ho (Slowed + Reverb)","Arijit Singh"],["Kun Faya Kun (Lofi Ambient)","A.R. Rahman"],["Ranjha (Lofi Version)","B Praak & Jasleen Royal"],["Raatan Lambiyan (Lofi Mix)","Jubin Nautiyal"]];
-
 function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 function normalize(data){const raw=data?.result||data?.tracks||data?.data||[];return (Array.isArray(raw)?raw:[]).map(t=>({title:t.title||t.name||t.trackName||"Unknown song",artist:t.artist||t.artists||"Unknown artist",thumbnail:t.thumbnail||t.cover||t.image||"",url:t.url||t.spotifyUrl||t.link||"",duration:t.duration||0})).filter(s=>s.url);}
 function featuredCard(song,index){
@@ -87,7 +85,6 @@ function render(){
 async function search(){
   const q=$("searchInput").value.trim();if(!q)return;
   state.loading=true;
-  $("featuredSection").classList.add("searching");
   $("results").innerHTML="";$("emptyState").classList.remove("hidden");$("emptyState").textContent="Searching…";
   try{
     const r=await fetch("/api/search?q="+encodeURIComponent(q));if(!r.ok)throw Error();
@@ -132,9 +129,7 @@ function toggle(){if(audio.paused)audio.play().catch(()=>{});else audio.pause()}
 function next(){if(!state.songs.length)return;const n=state.current+1;if(n<state.songs.length)play(n);else if(state.autoMood&&state.songs[state.current])findMoodSongs(state.songs[state.current]).then(x=>x.length?play(state.current+1):null);else play(0)}
 function prev(){if(!state.songs.length)return;play((state.current-1+state.songs.length)%state.songs.length)}
 $("searchButton").onclick=search;
-$("searchInput").addEventListener("focus",()=>{$("featuredSection").classList.add("searching")});
 $("searchInput").addEventListener("keydown",e=>{if(e.key==="Enter")search()});
-$("featuredResults").addEventListener("click",e=>{const p=e.target.closest("[data-featured-play]");if(p)playFeatured(Number(p.dataset.featuredPlay))});
 $("results").addEventListener("click",e=>{const p=e.target.closest("[data-play]"),d=e.target.closest("[data-download]");if(p)play(Number(p.dataset.play));if(d)download(Number(d.dataset.download))});
 async function download(i){try{const src=await getAudio(state.songs[i]);if(src)window.open(src,"_blank");else alert("Download link not found.")}catch{alert("Download failed.")}}
 $("miniInfo").onclick=()=>{$("fullPlayer").classList.add("open");$("fullPlayer").setAttribute("aria-hidden","false")};
@@ -148,5 +143,3 @@ audio.addEventListener("ended",()=>next());
 audio.addEventListener("timeupdate",()=>{const p=audio.duration?(audio.currentTime/audio.duration)*100:0;$("miniProgress").style.width=p+"%";$("seekBar").value=p;$("currentTime").textContent=fmt(audio.currentTime);$("totalTime").textContent=fmt(audio.duration)});
 $("seekBar").addEventListener("input",e=>{if(audio.duration)audio.currentTime=(Number(e.target.value)/100)*audio.duration});
 function fmt(s){if(!Number.isFinite(s))return"0:00";const m=Math.floor(s/60),sec=Math.floor(s%60).toString().padStart(2,"0");return m+":"+sec}
-renderFeatured();
-loadFeatured();
