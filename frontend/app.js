@@ -1,6 +1,38 @@
 const state={songs:[],current:-1,loading:false,playRequest:0,autoMood:true,recommending:false,featured:[],featuredLoaded:false};
 const $=id=>document.getElementById(id);
 const audio=$("audioPlayer");
+
+function updateDeviceStatus(){
+  const network=$("networkStatus");
+  const battery=$("batteryStatus");
+  const time=$("timeStatus");
+  const online=navigator.onLine;
+  network.textContent=online?"● Online":"○ Offline";
+  network.style.color=online?"#65d68a":"#ff6b6b";
+  time.textContent=new Intl.DateTimeFormat([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date());
+  const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  if(connection){
+    const type=connection.effectiveType||connection.type;
+    if(type) network.textContent=(online?"● ":"○ ")+String(type).toUpperCase();
+  }
+}
+async function updateBattery(){
+  const el=$("batteryStatus");
+  if(!navigator.getBattery){el.textContent="🔋 --%";return;}
+  try{
+    const b=await navigator.getBattery();
+    const set=()=>{el.textContent=(b.charging?"⚡ ":"🔋 ")+Math.round(b.level*100)+"%";};
+    set();
+    b.addEventListener("levelchange",set);
+    b.addEventListener("chargingchange",set);
+  }catch{el.textContent="🔋 --%";}
+}
+updateDeviceStatus();
+updateBattery();
+setInterval(updateDeviceStatus,1000);
+window.addEventListener("online",updateDeviceStatus);
+window.addEventListener("offline",updateDeviceStatus);
+
 function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
 function normalize(data){const raw=data?.result||data?.tracks||data?.data||[];return (Array.isArray(raw)?raw:[]).map(t=>({title:t.title||t.name||t.trackName||"Unknown song",artist:t.artist||t.artists||"Unknown artist",thumbnail:t.thumbnail||t.cover||t.image||"",url:t.url||t.spotifyUrl||t.link||"",duration:t.duration||0})).filter(s=>s.url);}
 function featuredCard(song,index){
