@@ -163,7 +163,7 @@ function render(){
   $("emptyState").classList.add("hidden");
   state.songs.forEach((s,i)=>{
     const el=document.createElement("article");el.className="song-card";
-    el.innerHTML=`<img src="${esc(s.thumbnail)}" alt=""><div class="song-info"><strong>${esc(s.title)}</strong><small>${esc(s.artist)}</small></div><div class="song-actions"><button class="icon-btn play" data-play="${i}" aria-label="Play">▶</button><button class="icon-btn download-btn" data-download="${i}" aria-label="Download">↓</button></div>`;
+    el.innerHTML=`<img src="${esc(s.thumbnail)}" alt=""><div class="song-info"><strong>${esc(s.title)}</strong><small>${esc(s.artist)}</small></div><div class="song-actions"><button class="icon-btn play" data-play="${i}" aria-label="Play">▶</button><button class="icon-btn download-btn" data-download="${i}" aria-label="Download song" title="Download">↓</button></div>`;
     box.appendChild(el);
   });
 }
